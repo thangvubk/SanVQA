@@ -12,13 +12,13 @@ import argparse
 def download_vqa():
  
   
-    os.system('wget http://visualqa.org/data/mscoco/vqa/Questions_Train_mscoco.zip -P zip/')
-    os.system('wget http://visualqa.org/data/mscoco/vqa/Questions_Val_mscoco.zip -P zip/')
-    os.system('wget http://visualqa.org/data/mscoco/vqa/Questions_Test_mscoco.zip -P zip/')
+    #os.system('wget http://visualqa.org/data/mscoco/vqa/Questions_Train_mscoco.zip -P zip/')
+    #os.system('wget http://visualqa.org/data/mscoco/vqa/Questions_Val_mscoco.zip -P zip/')
+    #os.system('wget http://visualqa.org/data/mscoco/vqa/Questions_Test_mscoco.zip -P zip/')
 
-    # Download the VQA Annotations :
-    os.system('wget http://visualqa.org/data/mscoco/vqa/Annotations_Train_mscoco.zip -P zip/')
-    os.system('wget http://visualqa.org/data/mscoco/vqa/Annotations_Val_mscoco.zip -P zip/')
+    ## Download the VQA Annotations :
+    #os.system('wget http://visualqa.org/data/mscoco/vqa/Annotations_Train_mscoco.zip -P zip/')
+    #os.system('wget http://visualqa.org/data/mscoco/vqa/Annotations_Val_mscoco.zip -P zip/')
 
     # Let us now unzip the annotations :
     os.system('unzip zip/Questions_Train_mscoco.zip -d annotations/')
@@ -41,7 +41,7 @@ def main(params):
 
     if params['split'] == 1:
         # Train on train and Test on val
-        print 'Loading annotations and questions...'
+        print('Loading annotations and questions...')
         train_anno = json.load(open('annotations/mscoco_train2014_annotations.json', 'r'))
         val_anno = json.load(open('annotations/mscoco_val2014_annotations.json', 'r'))
     
@@ -125,8 +125,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     params = vars(args)
-    print 'parsed input parameters:'
-    print json.dumps(params, indent = 2)
+    print('parsed input parameters:')
+    print(json.dumps(params, indent = 2))
     main(params)
       
     

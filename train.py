@@ -107,7 +107,7 @@ def main(params):
         
 
         running_loss = 0.0
-        for i, (image, question, ques_len, ans) in enumerate(train_loader):
+        for i, (image, question, ques_id, ques_len, ans) in enumerate(train_loader):
             bar.update(i, force=True)
             image = Variable(image)
             question = Variable(question)
