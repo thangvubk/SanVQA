@@ -174,10 +174,7 @@ def get_unqiue_img(imgs):
         for j in range(len(ques_list)):
             ques_pos[idx][j] = ques_list[j]
     return unique_img, img_pos, ques_pos, ques_pos_len
-#def decode_ans(top_ans):
-#    result = []
-#    for i, w in enumerate(top_ans):
-#        result.append('{u'answer': ans, u'question_id': str(current_ques_id[i])
+
 def main(params):
 
     imgs_train = json.load(open(params['input_train_json'], 'r'))

@@ -17,11 +17,11 @@ def main(params):
 
     opt = {
             'feature_type': params['feature_type'],
-            'h5_img_file' : params['input_img_test_h5'],
+            'h5_img_file_test' : params['input_img_test_h5'],
             'h5_ques_file': params['input_ques_h5'],
             'json_file'   : params['input_json']
             }
-    test_dataset = CDATA(opt, train=False, quiet=( not params['print_params']))
+    test_dataset = CDATA(opt, phase='valid', quiet=( not params['print_params']))
 
     test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
                                                batch_size=params['batch_size'],
@@ -44,6 +44,10 @@ def main(params):
         question_model.cuda()
 	image_model.cuda()
 	attention_model.cuda()
+
+    question_model.eval()
+    image_model.eval()
+    attention_model.eval()
 
     question_model.load_state_dict(torch.load(
         os.path.join(params['checkpoint_path'], 'question_model.pkl')))
