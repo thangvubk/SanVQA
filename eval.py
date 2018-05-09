@@ -45,22 +45,47 @@ def main(params):
 	image_model.cuda()
 	attention_model.cuda()
 
+
+    question_model.load_state_dict(torch.load(
+        os.path.join(params['checkpoint_path'], 'best_question_model.pkl')))
+    image_model.load_state_dict(torch.load(
+        os.path.join(params['checkpoint_path'], 'best_image_model.pkl')))
+    attention_model.load_state_dict(torch.load(
+        os.path.join(params['checkpoint_path'], 'best_attention_model.pkl')))
+
     question_model.eval()
     image_model.eval()
     attention_model.eval()
 
-    question_model.load_state_dict(torch.load(
-        os.path.join(params['checkpoint_path'], 'question_model.pkl')))
-    image_model.load_state_dict(torch.load(
-        os.path.join(params['checkpoint_path'], 'image_model.pkl')))
-    attention_model.load_state_dict(torch.load(
-        os.path.join(params['checkpoint_path'], 'attention_model.pkl')))
-
     with open('data/top_ans.txt','r') as f:
         str_ans = f.read().splitlines()
-
+    criterion = nn.CrossEntropyLoss()
     correct, total = 0, 0
     result = []
+    val_acc = 0.0
+    running_loss = 0.0
+    for i, (image, question, ques_id, ques_len, ans) in enumerate(test_loader):
+        image = Variable(image)
+        question = Variable(question)
+        ans = Variable(ans, requires_grad=False)
+        if (params['use_gpu'] and torch.cuda.is_available()):
+            image = image.cuda()
+            question = question.cuda()
+            ans = ans.cuda()
+
+        img_emb = image_model(image)
+        ques_emb = question_model(question, ques_len)
+        output = attention_model(ques_emb, img_emb)
+
+        loss = criterion(output, ans)
+        running_loss += loss.data[0]
+        total += ans.size(0)
+        _, prediction = torch.max(output.data, 1)
+        val_acc += (prediction.cpu() == ans).sum()
+            
+    val_acc = val_acc/total*100
+    print(val_acc)
+    return 
     for i, (image, question, ques_id, ques_len, ans) in enumerate(test_loader):
         image = Variable(image, requires_grad=False)
         question = Variable(question, requires_grad=False)
@@ -76,7 +101,7 @@ def main(params):
         total += ans.size(0)
         correct += (prediction.cpu() == ans).sum()
         for j in range(ans.size(0)):
-            ans_idx = prediction.cpu()[j]# - 1 #inx from 1
+            ans_idx = prediction.cpu()[j] 
             result.append({u'answer': str_ans[ans_idx], u'question_id': ques_id[j]})
         if not (i+1)%100:
             print('Accuracy on %d images: %f%%'%(total, 100.0*correct/total))

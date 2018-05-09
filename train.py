@@ -1,3 +1,4 @@
+from __future__ import division, print_function
 import argparse
 import numpy as np
 import json
@@ -16,14 +17,6 @@ import torch.optim.lr_scheduler as lr_scheduler
 import torch.backends.cudnn as cudnn
 from tensorboardX import SummaryWriter
 
-def adjust_learning_rate(optimizer, epoch, lr, learning_rate_decay_every):
-    # Sets the learning rate to the initial LR decayed by 10 every learning_rate_decay_every epochs
-    lr_tmp = lr * (0.5 ** (epoch // learning_rate_decay_every))
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr_tmp
-    return lr_tmp
-
-
 def main(params):
     # Construct Data loader
     opt = {
@@ -39,7 +32,7 @@ def main(params):
                                                shuffle=True)
 
     val_dataset = CDATA(opt, phase='valid', quiet=( not params['print_params']))
-    val_loader = torch.utils.data.DataLoader(dataset=train_dataset,
+    val_loader = torch.utils.data.DataLoader(dataset=val_dataset,
                                                batch_size=params['batch_size'],
                                                shuffle=False)
     # Construct NN models
@@ -63,6 +56,12 @@ def main(params):
         image_model.cuda()
         attention_model.cuda()
         cudnn.benchmark = True
+
+    if torch.cuda.device_count() > 1:
+        print("Using", torch.cuda.device_count(), "GPUs!")
+        question_model = nn.DataParallel(question_model)
+        image_model = nn.DataParallel(image_model)
+        attention_model = nn.DataParallel(attention_model)
 
     if params['resume_from_epoch'] > 1:
         load_model_dir = os.path.join(params['checkpoint'], str(params['resume_from_epoch']-1))
@@ -147,44 +146,40 @@ def main(params):
 
             _, prediction = torch.max(output.data, 1)
             train_acc += (prediction.cpu() == ans.data.cpu()).sum()
-            writer.add_scalar('Running train loss', loss.data[0], epoch*params['batch_size'] + i)
+            writer.add_scalar('Running train loss', loss.data[0], epoch*num_batches + i)
         
         train_acc = train_acc/len(train_dataset)*100
         train_loss = running_loss/num_batches
         print('Training loss: %.4f' %train_loss)
-        print('Training accuracy %.2f' %train_acc)
+        print('Training accuracy: %.2f' %train_acc)
         writer.add_scalar('Training loss', train_loss, epoch)
         writer.add_scalar('Training acc', train_acc, epoch)
         
-        print('validating')
+        print('Validating')
         image_model.eval()
         question_model.eval()
         attention_model.eval()
 
         running_loss = 0.0
         val_acc = 0.0
+        num_batches = len(val_dataset)//params['batch_size']
+        bar = progressbar.ProgressBar(max_value=num_batches)
         for i, (image, question, ques_id, ques_len, ans) in enumerate(val_loader):
-            #bar.update(i, force=True)
+            bar.update(i+1, force=True)
             image = Variable(image)
             question = Variable(question)
-            ans = Variable(ans, requires_grad=False)
             if (params['use_gpu'] and torch.cuda.is_available()):
                 image = image.cuda()
                 question = question.cuda()
-                ans = ans.cuda()
 
             img_emb = image_model(image)
             ques_emb = question_model(question, ques_len)
             output = attention_model(ques_emb, img_emb)
 
-            loss = criterion(output, ans)
-            running_loss += loss.data[0]
-
             _, prediction = torch.max(output.data, 1)
-            val_acc += (prediction.cpu() == ans.data.cpu()).sum()
+            val_acc += (prediction.cpu() == ans).sum()
             
         val_acc = val_acc/len(val_dataset)*100
-        val_loss = running_loss/num_batches
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
@@ -194,15 +189,14 @@ def main(params):
         torch.save(question_model.state_dict(), os.path.join(checkpoint, 'latest_question_model.pkl'))
         torch.save(image_model.state_dict(), os.path.join(checkpoint, 'latest_image_model.pkl'))
         torch.save(attention_model.state_dict(), os.path.join(checkpoint, 'latest_attention_model.pkl'))
-        print('Validation lossi %.4f' %val_loss)
-        print('Validation accuracy %.2f' %val_acc)
-        print('Best validation acc %.2f' %best_val_acc)
-        writer.add_scalar('Val loss', val_loss, epoch)
+        print('Validation accuracy: %.2f' %val_acc)
+        print('Best validation acc: %.2f' %best_val_acc)
         writer.add_scalar('Val acc', val_acc, epoch)
         writer.add_scalar('Best val acc', best_val_acc, epoch)
 
         scheduler.step()
     print('Best validation acc %.2f' %best_val_acc)
+    print()
     writer.export_scalars_to_json(log_file)
     writer.close()
 
@@ -234,7 +228,7 @@ if __name__ == "__main__":
 
     # Optimization
     parser.add_argument('--optim', default='sgd', help='what update to use? rmsprop|sgd|sgdmom|adagrad|adam')
-    parser.add_argument('--learning_rate', default=0.05, type=float, help='learning rate')
+    parser.add_argument('--learning_rate', default=5e-4, type=float, help='learning rate')
     parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
     parser.add_argument('--lr_schedule', type=int, nargs='+', default=[40, 60, 80], help='lr decay schedule')
     parser.add_argument('--lr_step', type=float, default=0.5, help='lr decay factor')
@@ -260,5 +254,5 @@ if __name__ == "__main__":
     params = vars(args)                     # convert to ordinary dict
     if params['print_params']:
         print('parsed input parameters:')
-        print json.dumps(params, indent = 2)
+        print(json.dumps(params, indent = 2))
     main(params)
